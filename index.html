@@ -1,0 +1,194 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Work Dashboard</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#263238">
+<style>
+body{margin:0;background:#f6f2e9;font-family:Arial;color:#1f2933}
+header{background:#263238;color:white;text-align:center;padding:16px}
+main{padding:12px;max-width:900px;margin:auto}
+.card{background:white;border:2px solid #ddd6ca;border-radius:18px;padding:14px;margin:12px 0}
+input,textarea,select{width:100%;box-sizing:border-box;font-size:16px;padding:11px;margin:5px 0;border:2px solid #ddd6ca;border-radius:12px}
+textarea{min-height:70px}
+button{border:0;border-radius:12px;padding:10px 12px;margin:4px;font-weight:bold;color:white;background:#263238}
+.green{background:#15803d}.red{background:#b91c1c}.blue{background:#2563eb}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tab{background:#e5e7eb;color:#111}.active{background:#263238;color:white}
+.hidden{display:none}
+.task{background:#fffdfa;border:2px solid #ddd6ca;border-left:10px solid #2563eb;border-radius:14px;padding:12px;margin:10px 0}
+.p1,.p2,.p3{border-left-color:#b91c1c}.p4,.p5,.p6{border-left-color:#d97706}.p7,.p8,.p9,.p10{border-left-color:#15803d}
+.badge{display:inline-block;color:white;background:#2563eb;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:bold;margin:2px}
+.high{background:#b91c1c}.mid{background:#d97706}.low{background:#15803d}
+.note{border-top:1px solid #ddd6ca;margin-top:8px;padding-top:8px;white-space:pre-wrap}
+.time{font-weight:bold;color:#2563eb}
+.stat{font-size:28px;font-weight:bold}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:600px){.tabs{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><h1>Work Dashboard</h1></header>
+<main>
+
+<div class="tabs">
+<button class="tab active" onclick="show('dash')" id="tdash">Dashboard</button>
+<button class="tab" onclick="show('daily')" id="tdaily">Daily</button>
+<button class="tab" onclick="show('projects')" id="tprojects">Projects</button>
+<button class="tab" onclick="show('archive')" id="tarchive">Archive</button>
+</div>
+
+<section id="dash">
+<div class="grid">
+<div class="card"><b>Daily tasks</b><div class="stat" id="sDaily">0</div></div>
+<div class="card"><b>Projects</b><div class="stat" id="sProjects">0</div></div>
+<div class="card"><b>High priority</b><div class="stat" id="sHigh">0</div></div>
+<div class="card"><b>Archived</b><div class="stat" id="sArchive">0</div></div>
+</div>
+<div class="card"><h2>High priority focus</h2><div id="focus"></div></div>
+<div class="card"><h2>Search</h2><input id="search" oninput="render()" placeholder="Search tasks, projects or notes"><div id="results"></div></div>
+</section>
+
+<section id="daily" class="hidden">
+<div class="card">
+<h2>Add daily task</h2>
+<input id="dTitle" placeholder="Daily task">
+<select id="dCat"><option>Clinical</option><option>Medication Reviews</option><option>Follow-ups</option><option>Admin</option><option>CEPIP</option><option>Audits</option></select>
+<textarea id="dDetail" placeholder="Details"></textarea>
+<button class="green" onclick="addDaily()">Add daily task</button>
+</div>
+<div class="card"><h2>Today's tasks</h2><div id="dailyList"></div></div>
+</section>
+
+<section id="projects" class="hidden">
+<div class="card">
+<h2>Add long-term project</h2>
+<input id="pTitle" placeholder="Project title">
+<select id="pCat"><option>Clinical</option><option>Medication Reviews</option><option>CEPIP</option><option>Audits</option><option>Follow-ups</option><option>Admin</option></select>
+<select id="pPriority"><option value="1">Priority 1 - urgent</option><option value="2">Priority 2</option><option value="3">Priority 3</option><option value="4">Priority 4</option><option value="5">Priority 5</option><option value="6">Priority 6</option><option value="7">Priority 7</option><option value="8">Priority 8</option><option value="9">Priority 9</option><option value="10">Priority 10</option></select>
+<select id="pStatus"><option>Not started</option><option>In progress</option><option>Waiting</option><option>Complete</option></select>
+<input id="pProgress" type="number" min="0" max="100" placeholder="Progress %">
+<textarea id="pDetail" placeholder="Details"></textarea>
+<button class="green" onclick="addProject()">Add project</button>
+</div>
+<div class="card"><h2>Projects</h2><div id="projectList"></div></div>
+</section>
+
+<section id="archive" class="hidden">
+<div class="card">
+<h2>Archive</h2>
+<button class="blue" onclick="exportData()">Export all</button>
+<button class="red" onclick="resetAll()">Reset everything</button>
+<div id="archiveList"></div>
+</div>
+</section>
+
+</main>
+
+<script>
+let data=JSON.parse(localStorage.getItem("workDash")||'{"daily":[],"projects":[],"archive":[]}');
+
+function now(){return new Date().toLocaleString("en-GB",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"})}
+function save(){localStorage.setItem("workDash",JSON.stringify(data));render()}
+function priClass(p){return p<=3?"high":p<=6?"mid":"low"}
+
+function show(page){
+["dash","daily","projects","archive"].forEach(x=>document.getElementById(x).className=x==page?"":"hidden");
+["tdash","tdaily","tprojects","tarchive"].forEach(x=>document.getElementById(x).className="tab");
+document.getElementById("t"+page).className="tab active";
+render();
+}
+
+function addDaily(){
+if(!dTitle.value.trim())return;
+data.daily.push({id:Date.now(),title:dTitle.value,cat:dCat.value,detail:dDetail.value,created:now(),notes:[]});
+dTitle.value="";dDetail.value="";save();
+}
+
+function addProject(){
+if(!pTitle.value.trim())return;
+data.projects.push({id:Date.now(),title:pTitle.value,cat:pCat.value,priority:+pPriority.value,status:pStatus.value,progress:+pProgress.value||0,detail:pDetail.value,created:now(),notes:[]});
+pTitle.value="";pDetail.value="";pProgress.value="";save();
+}
+
+function addNote(type,id){
+let box=document.getElementById("note"+type+id);
+if(!box.value.trim())return;
+data[type].forEach(t=>{if(t.id==id)t.notes.push({time:now(),text:box.value})});
+save();
+}
+
+function archiveItem(type,id){
+let arr=data[type];
+let item=arr.find(t=>t.id==id);
+if(!item)return;
+data[type]=arr.filter(t=>t.id!=id);
+item.archived=now();
+data.archive.push(item);
+save();
+}
+
+function drawTask(t,type){
+let p=t.priority||10;
+let h=`<div class="task p${p}">
+<h3>${t.title}</h3>
+<span class="badge">${t.cat||"Task"}</span>`;
+if(type=="projects")h+=`<span class="badge ${priClass(p)}">Priority ${p}</span><span class="badge">${t.status}</span>`;
+h+=`<p>${t.detail||""}</p><small>Created: ${t.created}</small>`;
+if(type=="projects")h+=`<p><b>Progress:</b> ${t.progress||0}%</p>`;
+h+=`<textarea id="note${type}${t.id}" placeholder="Progress update"></textarea>
+<button class="blue" onclick="addNote('${type}',${t.id})">Add progress</button>
+<button class="green" onclick="archiveItem('${type}',${t.id})">Complete / Archive</button>`;
+t.notes.forEach(n=>h+=`<div class="note"><div class="time">${n.time}</div>${n.text}</div>`);
+h+=`</div>`;
+return h;
+}
+
+function render(){
+sDaily.textContent=data.daily.length;
+sProjects.textContent=data.projects.length;
+sHigh.textContent=data.projects.filter(t=>t.priority<=3).length;
+sArchive.textContent=data.archive.length;
+
+dailyList.innerHTML=data.daily.length?data.daily.map(t=>drawTask(t,"daily")).join(""):"<p>No daily tasks.</p>";
+
+let sorted=data.projects.slice().sort((a,b)=>a.priority-b.priority);
+projectList.innerHTML=sorted.length?sorted.map(t=>drawTask(t,"projects")).join(""):"<p>No projects.</p>";
+
+let high=sorted.filter(t=>t.priority<=3);
+focus.innerHTML=high.length?high.map(t=>drawTask(t,"projects")).join(""):"<p>No high priority projects.</p>";
+
+archiveList.innerHTML=data.archive.length?data.archive.map(t=>`<div class="task"><h3>${t.title}</h3><p>Archived: ${t.archived}</p></div>`).join(""):"<p>Nothing archived.</p>";
+
+let q=search.value.toLowerCase().trim();
+if(q){
+let all=[...data.daily,...data.projects,...data.archive];
+let hits=all.filter(t=>JSON.stringify(t).toLowerCase().includes(q));
+results.innerHTML=hits.length?hits.map(t=>`<div class="task"><h3>${t.title}</h3><p>${t.cat||""}</p></div>`).join(""):"<p>No results.</p>";
+}else results.innerHTML="";
+}
+
+function exportData(){
+let a=document.createElement("a");
+a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"text/plain"}));
+a.download="work-dashboard-export.txt";
+a.click();
+}
+
+function resetAll(){
+if(confirm("Delete everything?")){
+data={daily:[],projects:[],archive:[]};
+save();
+}
+}
+
+if("serviceWorker" in navigator){
+navigator.serviceWorker.register("service-worker.js");
+}
+
+render();
+</script>
+</body>
+</html>
