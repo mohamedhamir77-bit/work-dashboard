@@ -1,0 +1,8 @@
+{
+  "name": "Work Dashboard",
+  "short_name": "WorkDash",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f2e9",
+  "theme_color": "#263238"
+}
